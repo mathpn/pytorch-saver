@@ -93,15 +93,12 @@ class ModelContainer:
         model_kwargs = model_kwargs or {}
         optim_kwargs = optim_kwargs or {}
         scheduler_kwargs = scheduler_kwargs or {}
-        objects = {}
         self.model = model_class(**model_kwargs)
-        objects["model"] = self.model
         if optim_class:
             self.optim = optim_class(self.model.parameters(), **optim_kwargs)
-            objects["optim"] = self.optim
         if scheduler_class and optim_class:
             self.scheduler = scheduler_class(self.optim, **scheduler_kwargs)
-            objects["scheduler"] = self.scheduler
+        objects = ModelObjects(model=self.model, optimizer=self.optim, scheduler=self.scheduler)
         return objects
 
     def load(
