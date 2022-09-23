@@ -83,6 +83,8 @@ class ModelContainer:
             objects (dict): dictionary with created objects
                 keys: model and, optionally, optim and scheduler
         """
+        self._check_classes(model_class, optim_class, scheduler_class)
+
         self.objects_kwargs = {
             "model_kwargs": model_kwargs,
             "optim_kwargs": optim_kwargs,
@@ -126,6 +128,8 @@ class ModelContainer:
             metadata_dict (dict): dictionary with loaded metadata
             objects (dict): dictionary with loaded objects
         """
+        self._check_classes(model_class, optim_class, scheduler_class)
+
         with zipfile.ZipFile(file_path, "r") as zip_file:
             metadata_dict = json.loads(zip_file.read("metadata.json"))
             state_dicts = pickle.loads(zip_file.read("state_dicts.pkl"))
@@ -199,6 +203,13 @@ class ModelContainer:
         metadata_dict = self._create_metadata_dict(**kwargs)
         file_path = self._save_zip(folder_path, prefix, "inference", metadata_dict, state_dicts)
         return file_path
+
+    def _check_classes(self, model_class, optim_class, scheduler_class) -> None:
+        if not issubclass(model_class, nn.Module):
+            raise ValueError("model_class must be an instance of torch.nn.Module")
+
+        if scheduler_class is not None and optim_class is None:
+            raise ValueError("optimizer must be initialized to use a scheduler")
 
     def _create_metadata_dict(self, **kwargs) -> dict[str, Any]:
         for key, value in kwargs.items():
