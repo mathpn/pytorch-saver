@@ -3,7 +3,18 @@ import json
 import pickle
 import time
 import zipfile
-from typing import Any
+from typing import Any, Dict, NamedTuple, Optional, Tuple
+
+import torch
+from torch import nn
+
+Metadata = Dict[str, Any]
+
+
+class ModelObjects(NamedTuple):
+    model: nn.Module
+    optimizer: Optional[Any] = None
+    scheduler: Optional[Any] = None
 
 
 class ModelContainer:
@@ -42,13 +53,13 @@ class ModelContainer:
 
     def initialize(
         self,
-        model_class,
-        model_kwargs,
+        model_class: nn.Module,
+        model_kwargs: Dict[str, Any],
         optim_class=None,
         optim_kwargs=None,
         scheduler_class=None,
         scheduler_kwargs=None,
-    ) -> dict[str, Any]:
+    ) -> ModelObjects:
         """
         Initialize objects required for training or inference.
 
@@ -91,7 +102,13 @@ class ModelContainer:
             objects["scheduler"] = self.scheduler
         return objects
 
-    def load(self, file_path: str, model_class, optim_class=None, scheduler_class=None):
+    def load(
+        self,
+        file_path: str,
+        model_class: nn.Module,
+        optim_class: Optional[Any] = None,
+        scheduler_class: Optional[Any] = None,
+    ) -> Tuple[Metadata, ModelObjects]:
         """
         Load stored state_dicts and metadata.
 
