@@ -38,10 +38,10 @@ class ModelContainer:
     load(self, file_path: str, model_class, optim_class=None, scheduler_class=None):
         Load stored state_dicts and metadata.
 
-    save(self, **kwargs):
+    save(self, folder_path: str, **kwargs):
         Save internal objects and associated metadata.
 
-    save_inference(self, **kwargs)
+    save_inference(self, folder_path: str, **kwargs)
         Save only model and associated metadata.
     """
 
@@ -140,7 +140,7 @@ class ModelContainer:
         self._load_state_dicts(state_dicts)
         return metadata_dict, objects
 
-    def save(self, **kwargs) -> None:
+    def save(self, folder_path: str, prefix: Optional[str] = None, **kwargs) -> None:
         """
         Save internal objects and associated metadata.
 
@@ -151,13 +151,26 @@ class ModelContainer:
         Any additional kwargs passed to this function are stored
         in metadata.json and must be JSON-serializable.
 
-        Returns: None
+        Arguments
+        ---------
+        folder_path : str
+            path to folder to save the checkpoint file
+        prefix : str
+            prefix string used to identify the saved file. Default is no prefix
+        **kwargs
+            extra keyword arguments are stored in metadata.json inside the saved ZIP
+
+        Returns
+        -------
+        file_path : str
+            file path to saved ZIP file
         """
         state_dicts = self._create_state_dicts()
         metadata_dict = self._create_metadata_dict(**kwargs)
-        self._save_zip(metadata_dict, state_dicts)
+        file_path = self._save_zip(folder_path, prefix, "checkpoint", metadata_dict, state_dicts)
+        return file_path
 
-    def save_inference(self, **kwargs) -> None:
+    def save_inference(self, folder_path: str, prefix: Optional[str] = None, **kwargs) -> None:
         """
         Save only model and associated metadata.
 
@@ -168,11 +181,24 @@ class ModelContainer:
         Any additional kwargs passed to this function are stored
         in metadata.json and must be JSON-serializable.
 
-        Returns: None
+        Arguments
+        ---------
+        folder_path : str
+            path to folder to save the checkpoint file
+        prefix : str
+            prefix string used to identify the saved file. Default is no prefix
+        **kwargs
+            extra keyword arguments are stored in metadata.json inside the saved ZIP
+
+        Returns
+        -------
+        file_path : str
+            file path to saved ZIP file
         """
         state_dicts = self._create_state_dicts(inference=True)
         metadata_dict = self._create_metadata_dict(**kwargs)
-        self._save_zip(metadata_dict, state_dicts)
+        file_path = self._save_zip(folder_path, prefix, "inference", metadata_dict, state_dicts)
+        return file_path
 
     def _create_metadata_dict(self, **kwargs) -> dict[str, Any]:
         for key, value in kwargs.items():
@@ -197,14 +223,20 @@ class ModelContainer:
             state_dicts["scheduler_state_dict"] = self.scheduler.state_dict()
         return state_dicts
 
-    def _save_zip(self, metadata_dict, state_dicts) -> None:
+    def _save_zip(self, folder_path: str, prefix: str, file_name: str, metadata_dict, state_dicts) -> str:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
             zip_file.writestr("metadata.json", json.dumps(metadata_dict, indent=2))
             zip_file.writestr("state_dicts.pkl", pickle.dumps(state_dicts))
 
-        with open("checkpoint.zip", "wb") as zip_file:
+        if prefix:
+            file_path = f"{folder_path}/{prefix}_{file_name}_{int(time.time())}.zip"
+        else:
+            file_path = f"{folder_path}/{file_name}_{int(time.time())}.zip"
+
+        with open(file_path, "wb") as zip_file:
             zip_file.write(buffer.getvalue())
+        return file_path
 
     def _load_state_dicts(self, state_dicts: dict[str, dict]) -> None:
         self.model.load_state_dict(state_dicts["model_state_dict"])
