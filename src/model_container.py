@@ -5,7 +5,6 @@ import time
 import zipfile
 from typing import Any, Dict, NamedTuple, Optional, Tuple
 
-import torch
 from torch import nn
 
 Metadata = Dict[str, Any]
@@ -15,6 +14,18 @@ class ModelObjects(NamedTuple):
     model: nn.Module
     optimizer: Optional[Any] = None
     scheduler: Optional[Any] = None
+
+
+class InitializationError(Exception):
+    pass
+
+
+def _initialize(name: str, object_class, *args, **kwargs):
+    try:
+        obj = object_class(*args, **kwargs)
+    except Exception as exc:
+        raise InitializationError(f"failed to initialize {name}") from exc
+    return obj
 
 
 class ModelContainer:
@@ -93,12 +104,18 @@ class ModelContainer:
         model_kwargs = model_kwargs or {}
         optim_kwargs = optim_kwargs or {}
         scheduler_kwargs = scheduler_kwargs or {}
-        self.model = model_class(**model_kwargs)
+        self.model = _initialize("model", model_class, **model_kwargs)
         if optim_class:
-            self.optim = optim_class(self.model.parameters(), **optim_kwargs)
+            self.optim = _initialize(
+                "optim", optim_class, self.model.parameters(), **optim_kwargs
+            )
         if scheduler_class and optim_class:
-            self.scheduler = scheduler_class(self.optim, **scheduler_kwargs)
-        objects = ModelObjects(model=self.model, optimizer=self.optim, scheduler=self.scheduler)
+            self.scheduler = _initialize(
+                "scheduler", scheduler_class, self.optim, **scheduler_kwargs
+            )
+        objects = ModelObjects(
+            model=self.model, optimizer=self.optim, scheduler=self.scheduler
+        )
         return objects
 
     def load(
@@ -168,10 +185,14 @@ class ModelContainer:
         """
         state_dicts = self._create_state_dicts()
         metadata_dict = self._create_metadata_dict(**kwargs)
-        file_path = self._save_zip(folder_path, prefix, "checkpoint", metadata_dict, state_dicts)
+        file_path = self._save_zip(
+            folder_path, prefix, "checkpoint", metadata_dict, state_dicts
+        )
         return file_path
 
-    def save_inference(self, folder_path: str, prefix: Optional[str] = None, **kwargs) -> None:
+    def save_inference(
+        self, folder_path: str, prefix: Optional[str] = None, **kwargs
+    ) -> None:
         """
         Save only model and associated metadata.
 
@@ -197,8 +218,10 @@ class ModelContainer:
             file path to saved ZIP file
         """
         state_dicts = self._create_state_dicts(inference=True)
-        metadata_dict = self._create_metadata_dict(**kwargs)
-        file_path = self._save_zip(folder_path, prefix, "inference", metadata_dict, state_dicts)
+        metadata_dict = self._create_metadata_dict(inference=True, **kwargs)
+        file_path = self._save_zip(
+            folder_path, prefix, "inference", metadata_dict, state_dicts
+        )
         return file_path
 
     def _check_classes(self, model_class, optim_class, scheduler_class) -> None:
@@ -208,17 +231,24 @@ class ModelContainer:
         if scheduler_class is not None and optim_class is None:
             raise ValueError("optimizer must be initialized to use a scheduler")
 
-    def _create_metadata_dict(self, **kwargs) -> dict[str, Any]:
+    def _create_metadata_dict(
+        self, *, inference: bool = False, **kwargs
+    ) -> dict[str, Any]:
         for key, value in kwargs.items():
             if not _is_json_serializable(value):
                 raise ValueError(
                     f"At least one provided argument is not JSON-serializable: {key} of type {type(value)}"
                 )
-        metadata_dict = {k: v for k, v in self.objects_kwargs.items() if v}
-        if overlap := set(metadata_dict).intersection(set(kwargs)):
-            raise ValueError(f"Provided keyword arguments contain reserved keywords: {sorted(overlap)}")
-        metadata_dict = {**metadata_dict, **kwargs}
+        if inference:
+            metadata_dict = {"model_kwargs": self.objects_kwargs["model_kwargs"]}
+        else:
+            metadata_dict = {k: v for k, v in self.objects_kwargs.items() if v}
         metadata_dict["timestamp"] = int(time.time())
+        if overlap := set(metadata_dict).intersection(set(kwargs)):
+            raise ValueError(
+                f"Provided keyword arguments contain reserved keywords: {sorted(overlap)}"
+            )
+        metadata_dict = {**metadata_dict, **kwargs}
         return metadata_dict
 
     def _create_state_dicts(self, inference: bool = False) -> dict[str, dict]:
@@ -231,12 +261,15 @@ class ModelContainer:
             state_dicts["scheduler_state_dict"] = self.scheduler.state_dict()
         return state_dicts
 
-    def _save_zip(self, folder_path: str, prefix: str, file_name: str, metadata_dict, state_dicts) -> str:
+    def _save_zip(
+        self, folder_path: str, prefix: str, file_name: str, metadata_dict, state_dicts
+    ) -> str:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
             zip_file.writestr("metadata.json", json.dumps(metadata_dict, indent=2))
             zip_file.writestr("state_dicts.pkl", pickle.dumps(state_dicts))
 
+        # TODO use timestamp from dictionary
         if prefix:
             file_path = f"{folder_path}/{prefix}_{file_name}_{int(time.time())}.zip"
         else:
