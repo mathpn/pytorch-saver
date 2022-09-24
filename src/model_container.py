@@ -153,7 +153,7 @@ class ModelContainer:
             optim_class,
             metadata_dict.get("optim_kwargs"),
             scheduler_class,
-            metadata_dict.get("scheduler_class"),
+            metadata_dict.get("scheduler_kwargs"),
         )
         self._load_state_dicts(state_dicts)
         return metadata_dict, objects
