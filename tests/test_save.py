@@ -7,14 +7,8 @@ import pytest
 import torch
 from dummy_model import Model
 
-from src.model_container import ModelContainer
-
-
-def _remove_saved_file(file_path):
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
+from pytorch_saver._helpers import _remove_saved_file
+from pytorch_saver._model_container import ModelContainer
 
 
 def test_save_model():

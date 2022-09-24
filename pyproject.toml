@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pytorch_saver"
+version = "0.1"
+authors = [
+  { name="Matheus Pedroni", email="pnmatheus@protonmail.com" },
+]
+description = "Simple helper to save and load PyTorch models"
+readme = "README.md"
+license = { file="LICENSE" }
+dependencies = ["torch >= 1.8.2"]
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]

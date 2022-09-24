@@ -7,6 +7,8 @@ from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 from torch import nn
 
+from pytorch_saver._helpers import _is_json_serializable
+
 Metadata = Dict[str, Any]
 
 
@@ -57,10 +59,10 @@ class ModelContainer:
     """
 
     def __init__(self):
-        self.objects_kwargs = {}
-        self.model = None
-        self.optim = None
-        self.scheduler = None
+        self.__objects_kwargs = {}
+        self.__model = None
+        self.__optim = None
+        self.__scheduler = None
 
     def initialize(
         self,
@@ -96,7 +98,7 @@ class ModelContainer:
         """
         self._check_classes(model_class, optim_class, scheduler_class)
 
-        self.objects_kwargs = {
+        self.__objects_kwargs = {
             "model_kwargs": model_kwargs,
             "optim_kwargs": optim_kwargs,
             "scheduler_kwargs": scheduler_kwargs,
@@ -104,17 +106,17 @@ class ModelContainer:
         model_kwargs = model_kwargs or {}
         optim_kwargs = optim_kwargs or {}
         scheduler_kwargs = scheduler_kwargs or {}
-        self.model = _initialize("model", model_class, **model_kwargs)
+        self.__model = _initialize("model", model_class, **model_kwargs)
         if optim_class:
-            self.optim = _initialize(
-                "optim", optim_class, self.model.parameters(), **optim_kwargs
+            self.__optim = _initialize(
+                "optim", optim_class, self.__model.parameters(), **optim_kwargs
             )
         if scheduler_class and optim_class:
-            self.scheduler = _initialize(
-                "scheduler", scheduler_class, self.optim, **scheduler_kwargs
+            self.__scheduler = _initialize(
+                "scheduler", scheduler_class, self.__optim, **scheduler_kwargs
             )
         objects = ModelObjects(
-            model=self.model, optimizer=self.optim, scheduler=self.scheduler
+            model=self.__model, optimizer=self.__optim, scheduler=self.__scheduler
         )
         return objects
 
@@ -233,16 +235,16 @@ class ModelContainer:
 
     def _create_metadata_dict(
         self, *, inference: bool = False, **kwargs
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         for key, value in kwargs.items():
             if not _is_json_serializable(value):
                 raise ValueError(
                     f"At least one provided argument is not JSON-serializable: {key} of type {type(value)}"
                 )
         if inference:
-            metadata_dict = {"model_kwargs": self.objects_kwargs["model_kwargs"]}
+            metadata_dict = {"model_kwargs": self.__objects_kwargs["model_kwargs"]}
         else:
-            metadata_dict = {k: v for k, v in self.objects_kwargs.items() if v}
+            metadata_dict = {k: v for k, v in self.__objects_kwargs.items() if v}
         metadata_dict["timestamp"] = int(time.time())
         if overlap := set(metadata_dict).intersection(set(kwargs)):
             raise ValueError(
@@ -251,14 +253,14 @@ class ModelContainer:
         metadata_dict = {**metadata_dict, **kwargs}
         return metadata_dict
 
-    def _create_state_dicts(self, inference: bool = False) -> dict[str, dict]:
-        if self.model is None:
+    def _create_state_dicts(self, inference: bool = False) -> Dict[str, Dict]:
+        if self.__model is None:
             raise RuntimeError("Model must be initialized or loaded before saving.")
-        state_dicts = {"model_state_dict": self.model.state_dict()}
-        if not inference and self.optim:
-            state_dicts["optim_state_dict"] = self.optim.state_dict()
-        if not inference and self.scheduler:
-            state_dicts["scheduler_state_dict"] = self.scheduler.state_dict()
+        state_dicts = {"model_state_dict": self.__model.state_dict()}
+        if not inference and self.__optim:
+            state_dicts["optim_state_dict"] = self.__optim.state_dict()
+        if not inference and self.__scheduler:
+            state_dicts["scheduler_state_dict"] = self.__scheduler.state_dict()
         return state_dicts
 
     def _save_zip(
@@ -280,19 +282,10 @@ class ModelContainer:
         return file_path
 
     def _load_state_dicts(self, state_dicts: dict[str, dict]) -> None:
-        self.model.load_state_dict(state_dicts["model_state_dict"])
+        self.__model.load_state_dict(state_dicts["model_state_dict"])
         optim_state_dict = state_dicts.get("optim_state_dict")
-        if optim_state_dict and self.optim:
-            self.optim.load_state_dict(optim_state_dict)
+        if optim_state_dict and self.__optim:
+            self.__optim.load_state_dict(optim_state_dict)
         scheduler_state_dict = state_dicts.get("scheduler_state_dict")
-        if scheduler_state_dict and self.scheduler:
-            self.optim.load_state_dict(optim_state_dict)
-
-
-def _is_json_serializable(obj) -> bool:
-    """check if an object is JSON-serializable."""
-    try:
-        json.dumps(obj)
-        return True
-    except (TypeError, OverflowError):
-        return False
+        if scheduler_state_dict and self.__scheduler:
+            self.__optim.load_state_dict(optim_state_dict)

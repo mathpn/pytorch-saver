@@ -4,15 +4,8 @@ import pytest
 import torch
 from dummy_model import Model
 
-from src.model_container import InitializationError, ModelContainer
-
-
-
-def _remove_saved_file(file_path):
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
+from pytorch_saver._helpers import _remove_saved_file
+from pytorch_saver._model_container import InitializationError, ModelContainer
 
 
 def test_load_model():
@@ -57,7 +50,12 @@ def test_load_model_optim_scheduler():
     )
     file_path = container.save("/tmp", prefix="test")
     container_2 = ModelContainer()
-    metadata, loaded_objs = container_2.load(file_path, Model, torch.optim.Adam, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
+    metadata, loaded_objs = container_2.load(
+        file_path,
+        Model,
+        torch.optim.Adam,
+        torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
+    )
     model_state_dict = model_objects.model.state_dict()
     loaded_model_state_dict = loaded_objs.model.state_dict()
     optim_state_dict = model_objects.optimizer.state_dict()
@@ -66,9 +64,7 @@ def test_load_model_optim_scheduler():
     loaded_scheduler_state_dict = loaded_objs.scheduler.state_dict()
     for key, value in loaded_model_state_dict.items():
         assert torch.all(value == model_state_dict.get(key))
-    assert (
-        loaded_optim_state_dict["param_groups"] == optim_state_dict["param_groups"]
-    )
+    assert loaded_optim_state_dict["param_groups"] == optim_state_dict["param_groups"]
     assert loaded_scheduler_state_dict == scheduler_state_dict
 
     assert metadata["model_kwargs"] == model_kwargs

@@ -3,7 +3,7 @@ import torch
 from dummy_model import Model
 from torch import nn
 
-from src.model_container import InitializationError, ModelContainer
+from pytorch_saver._model_container import InitializationError, ModelContainer
 
 
 def test_initialize_model():
