@@ -1,6 +1,8 @@
 # pytorch-saver
 Simple helper to save and load PyTorch models.
 
+repository: https://github.com/mathpn/pytorch-saver
+
 ## Why use this package to save and load models?
 
 PyTorch [suggests](https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_models_for_inference.html) two standard ways of saving and loading models: either saving their state_dict or saving the pickled model object itself.
@@ -14,11 +16,15 @@ Therefore, the goal of this package is to provide a pratical way of creating mod
 
 ## Installing
 
-Clone the repository and go inside its folder:
+Install with pip:
+
+    pip install pytorch-saver
+
+Or clone the repository and go inside its folder:
 
     cd pytorch-saver
 
-Install with pip:
+and install from source:
 
     pip install .
 
